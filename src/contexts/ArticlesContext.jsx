@@ -14,7 +14,6 @@ export function ArticlesProvider({ children }) {
   const [selectedFeedId, setSelectedFeedId] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [autoRefreshInterval, setAutoRefreshIntervalState] = useState(() => storage.getAutoRefreshInterval())
   const timerRef = useRef(null)
   const prevFeedIdsRef = useRef(new Set())
   const initialLoadDoneRef = useRef(false)
@@ -77,13 +76,7 @@ export function ArticlesProvider({ children }) {
     return () => clearInterval(timerRef.current)
   }, [feeds, fetchAllFeeds])
 
-  const setAutoRefresh = useCallback((v) => {
-    setAutoRefreshState(v)
-    storage.setAutoRefresh(v)
-  }, [])
-
   const setAutoRefreshInterval = useCallback((v) => {
-    setAutoRefreshIntervalState(v)
     storage.setAutoRefreshInterval(v)
   }, [])
 
@@ -167,9 +160,9 @@ export function ArticlesProvider({ children }) {
         setSelectedFeedId,
         selectedCategory,
         setSelectedCategory,
-        autoRefresh,
-        setAutoRefresh,
-        autoRefreshInterval,
+        autoRefresh: true,
+        setAutoRefresh: () => {},
+        autoRefreshInterval: 15 * 60 * 1000,
         setAutoRefreshInterval,
         markRead,
         markUnread,
