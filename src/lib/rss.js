@@ -120,23 +120,24 @@ function extractImageFromContent(html) {
   return match ? match[1] : null
 }
 
-async function fetchWithProxy(url, proxyFn) {
-  const proxyUrl = proxyFn(url)
-  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) })
-  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+async function fetchWithProxy(url, proxy) {
+  const proxyUrl = proxy.build(url)
+  const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`${proxy.label} HTTP ${res.status}`)
 
   let text
-  if (proxyUrl.includes('allorigins.win')) {
+  if (proxy.type === 'json') {
     const json = await res.json()
+    if (!json.contents) throw new Error(`${proxy.label} returned empty contents`)
     if (json.status?.http_code && json.status.http_code !== 200) {
-      throw new Error(`Origin returned ${json.status.http_code}`)
+      throw new Error(`${proxy.label} origin returned ${json.status.http_code}`)
     }
     text = json.contents
   } else {
     text = await res.text()
   }
 
-  if (!text) throw new Error('Empty response from proxy')
+  if (!text?.trim()) throw new Error(`${proxy.label} returned empty body`)
   return parseFeedXML(text)
 }
 
@@ -152,17 +153,17 @@ export async function fetchFeed(url) {
     }
   }
 
-  let lastError
-  for (const proxyFn of CORS_PROXIES) {
+  const errors = []
+  for (const proxy of CORS_PROXIES) {
     try {
-      const data = await fetchWithProxy(url, proxyFn)
+      const data = await fetchWithProxy(url, proxy)
       sessionStorage.setItem(cacheKey, JSON.stringify({ data, fetchedAt: Date.now() }))
       return { data, fromCache: false }
     } catch (err) {
-      lastError = err
+      errors.push(`${proxy.label}: ${err.message}`)
     }
   }
-  throw new Error(`Failed to fetch feed: ${lastError?.message}`)
+  throw new Error(`All proxies failed:\n${errors.join('\n')}`)
 }
 
 export function normalizeItems(feed, feedId) {

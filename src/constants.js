@@ -7,10 +7,25 @@ export const GITHUB_OAUTH_SCOPE = 'gist'
 
 export const GIST_FILENAME = 'rss-feed-reader-data.json'
 
+// CORS proxy definitions — each entry: { url: fn, type: 'raw'|'json' }
+// 'raw'  → response body is the XML text directly
+// 'json' → response body is JSON with a 'contents' field (allorigins format)
 export const CORS_PROXIES = [
-  (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
-  (url) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  (url) => `https://thingproxy.freeboard.io/fetch/${url}`,
+  {
+    build: (url) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+    type: 'raw',
+    label: 'codetabs',
+  },
+  {
+    build: (url) => `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`,
+    type: 'json',
+    label: 'allorigins',
+  },
+  {
+    build: (url) => `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+    type: 'raw',
+    label: 'corsproxy.io',
+  },
 ]
 
 export const CACHE_TTL_MS = 15 * 60 * 1000
