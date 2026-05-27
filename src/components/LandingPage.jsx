@@ -19,82 +19,8 @@ function GitHubIcon() {
   )
 }
 
-function DeviceFlowCard({ deviceFlow, devicePolling, onCancel }) {
-  const [copied, setCopied] = useState(false)
-
-  const copyCode = () => {
-    navigator.clipboard.writeText(deviceFlow.user_code).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
-
-  const openGitHub = () => {
-    window.open(deviceFlow.verification_uri, '_blank', 'noopener,noreferrer')
-  }
-
-  return (
-    <div className="w-full max-w-sm mx-auto rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 p-6 text-center">
-      <div className="text-3xl mb-3">🔐</div>
-      <h3 className="font-bold text-gray-900 dark:text-gray-100 mb-1">Authorize with GitHub</h3>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Copy this code, then click the button to authorize on GitHub.
-      </p>
-
-      {/* User code display */}
-      <div className="flex items-center justify-center gap-2 mb-4">
-        <span className="font-mono text-2xl font-bold tracking-widest text-blue-700 dark:text-blue-300 bg-white dark:bg-gray-900 px-4 py-2 rounded-xl border border-blue-200 dark:border-blue-700 select-all">
-          {deviceFlow.user_code}
-        </span>
-        <button
-          onClick={copyCode}
-          title="Copy code"
-          className="p-2 rounded-lg bg-white dark:bg-gray-900 border border-blue-200 dark:border-blue-700 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 transition-colors"
-        >
-          {copied ? '✓' : '⎘'}
-        </button>
-      </div>
-
-      <button
-        onClick={openGitHub}
-        className="w-full flex items-center justify-center gap-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-4 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors mb-3"
-      >
-        <GitHubIcon />
-        Open GitHub to Authorize
-      </button>
-
-      <div className="flex items-center justify-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-        {devicePolling && (
-          <>
-            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            Waiting for authorization...
-          </>
-        )}
-      </div>
-
-      <button
-        onClick={onCancel}
-        className="mt-3 text-xs text-gray-400 dark:text-gray-500 hover:underline"
-      >
-        Cancel
-      </button>
-    </div>
-  )
-}
-
 export function LandingPage({ theme, setTheme }) {
-  const {
-    loginWithGitHub,
-    loginWithPAT,
-    cancelDeviceFlow,
-    loading,
-    error,
-    setError,
-    oauthConfigured,
-    deviceFlow,
-    devicePolling,
-  } = useAuth()
-
+  const { loginWithGitHub, loginWithPAT, loading, error, setError, oauthConfigured } = useAuth()
   const [showPAT, setShowPAT] = useState(false)
   const [pat, setPat] = useState('')
   const [patLoading, setPatLoading] = useState(false)
@@ -137,15 +63,7 @@ export function LandingPage({ theme, setTheme }) {
         )}
 
         <div className="flex flex-col items-center gap-3 mb-4">
-          {/* Device flow active — show code card */}
-          {deviceFlow ? (
-            <DeviceFlowCard
-              deviceFlow={deviceFlow}
-              devicePolling={devicePolling}
-              onCancel={cancelDeviceFlow}
-            />
-          ) : showPAT ? (
-            /* PAT form */
+          {showPAT ? (
             <form onSubmit={handlePATSubmit} className="flex flex-col items-center gap-2 w-full max-w-md">
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Create a{' '}
@@ -185,22 +103,19 @@ export function LandingPage({ theme, setTheme }) {
               </button>
             </form>
           ) : (
-            /* Default: GitHub button */
             <>
-              {oauthConfigured ? (
-                <button
-                  onClick={loginWithGitHub}
-                  disabled={loading}
-                  className="flex items-center gap-3 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-6 py-3 rounded-xl font-semibold text-base hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 shadow-lg"
-                >
-                  <GitHubIcon />
-                  {loading ? 'Connecting...' : 'Sign in with GitHub'}
-                </button>
-              ) : (
-                <div className="rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 p-4 max-w-sm text-sm text-yellow-800 dark:text-yellow-300 text-left">
-                  <p className="font-semibold mb-1">GitHub OAuth not configured</p>
-                  <p>Set <code className="bg-yellow-100 dark:bg-yellow-900 px-1 rounded text-xs">VITE_GITHUB_CLIENT_ID</code> to enable one-click sign-in. See the README for setup instructions.</p>
-                </div>
+              <button
+                onClick={loginWithGitHub}
+                disabled={loading || !oauthConfigured}
+                className="flex items-center gap-3 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 px-6 py-3 rounded-xl font-semibold text-base hover:bg-gray-700 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 shadow-lg"
+              >
+                <GitHubIcon />
+                {loading ? 'Connecting...' : 'Sign in with GitHub'}
+              </button>
+              {!oauthConfigured && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">
+                  OAuth not configured — use a Personal Access Token below
+                </p>
               )}
               <button
                 onClick={() => setShowPAT(true)}

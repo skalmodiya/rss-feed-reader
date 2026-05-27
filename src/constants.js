@@ -1,4 +1,5 @@
 export const GITHUB_CLIENT_ID = import.meta.env.VITE_GITHUB_CLIENT_ID || ''
+export const OAUTH_PROXY_URL = import.meta.env.VITE_OAUTH_PROXY_URL || ''
 
 export const APP_BASE = '/rss-feed-reader/'
 
