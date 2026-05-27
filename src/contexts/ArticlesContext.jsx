@@ -13,10 +13,11 @@ export function ArticlesProvider({ children }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedFeedId, setSelectedFeedId] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState(null)
-  const [autoRefresh, setAutoRefreshState] = useState(() => storage.getAutoRefresh())
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [autoRefreshInterval, setAutoRefreshIntervalState] = useState(() => storage.getAutoRefreshInterval())
   const timerRef = useRef(null)
   const prevFeedIdsRef = useRef(new Set())
+  const initialLoadDoneRef = useRef(false)
 
   const fetchOneFeed = useCallback(async (feed, forceRefresh = false) => {
     setFeedStatus((prev) => ({ ...prev, [feed.id]: { ...prev[feed.id], loading: true, error: null } }))
@@ -48,7 +49,11 @@ export function ArticlesProvider({ children }) {
     const newFeeds = feeds.filter((f) => !prevFeedIdsRef.current.has(f.id))
     const removedIds = [...prevFeedIdsRef.current].filter((id) => !currentIds.has(id))
 
-    if (newFeeds.length) fetchAllFeeds(newFeeds)
+    if (newFeeds.length) {
+      // Force refresh on the very first load (login), use cache for newly added feeds
+      fetchAllFeeds(newFeeds, !initialLoadDoneRef.current)
+      initialLoadDoneRef.current = true
+    }
     if (removedIds.length) {
       setArticlesByFeed((prev) => {
         const next = { ...prev }
@@ -64,15 +69,13 @@ export function ArticlesProvider({ children }) {
     prevFeedIdsRef.current = currentIds
   }, [feeds, fetchAllFeeds])
 
+  // Auto-refresh all feeds every 15 minutes, always on
   useEffect(() => {
-    if (!autoRefresh) {
-      clearInterval(timerRef.current)
-      return
-    }
     clearInterval(timerRef.current)
-    timerRef.current = setInterval(() => fetchAllFeeds(feeds, true), autoRefreshInterval)
+    if (!feeds.length) return
+    timerRef.current = setInterval(() => fetchAllFeeds(feeds, true), 15 * 60 * 1000)
     return () => clearInterval(timerRef.current)
-  }, [autoRefresh, autoRefreshInterval, feeds, fetchAllFeeds])
+  }, [feeds, fetchAllFeeds])
 
   const setAutoRefresh = useCallback((v) => {
     setAutoRefreshState(v)
@@ -176,7 +179,12 @@ export function ArticlesProvider({ children }) {
           const feed = feeds.find((f) => f.id === id)
           if (feed) fetchOneFeed(feed, true)
         },
-        refreshAll: () => fetchAllFeeds(feeds, true),
+        refreshAll: async () => {
+          setIsRefreshing(true)
+          await Promise.allSettled(feeds.map((f) => fetchOneFeed(f, true)))
+          setIsRefreshing(false)
+        },
+        isRefreshing,
       }}
     >
       {children}

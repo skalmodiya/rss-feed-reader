@@ -7,7 +7,7 @@ import { AddFeedModal } from './modals/AddFeedModal'
 import { SettingsModal } from './modals/SettingsModal'
 
 export function Header({ onMenuClick, theme, setTheme }) {
-  const { searchQuery, setSearchQuery, refreshAll } = useArticles()
+  const { searchQuery, setSearchQuery, refreshAll, isRefreshing } = useArticles()
   const { user, logout } = useAuth()
   const [showAddFeed, setShowAddFeed] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
@@ -39,10 +39,11 @@ export function Header({ onMenuClick, theme, setTheme }) {
         <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={refreshAll}
+            disabled={isRefreshing}
             title="Refresh all feeds"
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-50"
           >
-            <ArrowPathIcon className="h-5 w-5" />
+            <ArrowPathIcon className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
 
           <button
