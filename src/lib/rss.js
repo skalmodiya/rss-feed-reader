@@ -1,13 +1,124 @@
-import Parser from 'rss-parser'
 import { CORS_PROXIES, CACHE_TTL_MS } from '../constants'
 
-const parser = new Parser({
-  timeout: 15000,
-  customFields: {
-    feed: ['language', 'managingEditor'],
-    item: ['media:content', 'media:thumbnail', 'enclosure'],
-  },
-})
+// Pure browser XML parser — no Node.js dependencies
+
+function getText(el, tag) {
+  return el.querySelector(tag)?.textContent?.trim() || ''
+}
+
+function getAttr(el, tag, attr) {
+  return el.querySelector(tag)?.getAttribute(attr) || ''
+}
+
+function parseFeedXML(xmlText) {
+  const doc = new DOMParser().parseFromString(xmlText, 'text/xml')
+
+  const parseError = doc.querySelector('parsererror')
+  if (parseError) throw new Error('Invalid XML: ' + parseError.textContent.slice(0, 100))
+
+  const isAtom = !!doc.querySelector('feed')
+  return isAtom ? parseAtom(doc) : parseRSS(doc)
+}
+
+function parseRSS(doc) {
+  const channel = doc.querySelector('channel')
+  if (!channel) throw new Error('No RSS channel found')
+
+  const feedImageUrl =
+    channel.querySelector('image > url')?.textContent?.trim() || ''
+
+  const items = [...doc.querySelectorAll('item')].map((item) => {
+    const guid = getText(item, 'guid') || getText(item, 'link')
+    const enclosureUrl = item.querySelector('enclosure')?.getAttribute('url') || ''
+    const mediaThumbnail =
+      item.querySelector('media\\:thumbnail, thumbnail')?.getAttribute('url') || ''
+    const mediaContent =
+      item.querySelector('media\\:content, content')?.getAttribute('url') || ''
+    const contentEncoded =
+      item.querySelector('content\\:encoded, encoded')?.textContent?.trim() || ''
+    const summary = item.querySelector('description')?.textContent?.trim() || ''
+    const pubDate = getText(item, 'pubDate')
+
+    return {
+      guid,
+      title: getText(item, 'title'),
+      link: getText(item, 'link'),
+      pubDate,
+      isoDate: pubDate ? toISOSafe(pubDate) : '',
+      summary: stripHtml(summary).slice(0, 300),
+      content: contentEncoded || summary,
+      author: getText(item, 'author') || getText(item, 'dc\\:creator, creator'),
+      thumbnail: mediaThumbnail || mediaContent || enclosureUrl || extractImageFromContent(contentEncoded || summary),
+    }
+  })
+
+  return {
+    title: getText(channel, 'title'),
+    description: getText(channel, 'description'),
+    link: getText(channel, 'link'),
+    image: { url: feedImageUrl },
+    items,
+  }
+}
+
+function parseAtom(doc) {
+  const feed = doc.querySelector('feed')
+
+  const items = [...doc.querySelectorAll('entry')].map((entry) => {
+    const id = getText(entry, 'id')
+    const link =
+      entry.querySelector('link[rel="alternate"]')?.getAttribute('href') ||
+      entry.querySelector('link:not([rel])')?.getAttribute('href') ||
+      entry.querySelector('link')?.getAttribute('href') || ''
+    const summary =
+      entry.querySelector('summary')?.textContent?.trim() ||
+      entry.querySelector('content')?.textContent?.trim() || ''
+    const content = entry.querySelector('content')?.textContent?.trim() || summary
+    const published = getText(entry, 'published') || getText(entry, 'updated')
+
+    return {
+      guid: id || link,
+      title: getText(entry, 'title'),
+      link,
+      pubDate: published,
+      isoDate: published ? toISOSafe(published) : '',
+      summary: stripHtml(summary).slice(0, 300),
+      content,
+      author: getText(entry, 'name') || getText(entry, 'author'),
+      thumbnail: extractImageFromContent(content || summary),
+    }
+  })
+
+  return {
+    title: getText(feed, 'title'),
+    description: getText(feed, 'subtitle'),
+    link:
+      feed.querySelector('link[rel="alternate"]')?.getAttribute('href') ||
+      feed.querySelector('link')?.getAttribute('href') || '',
+    image: { url: '' },
+    items,
+  }
+}
+
+function toISOSafe(dateStr) {
+  try {
+    const d = new Date(dateStr)
+    return isNaN(d.getTime()) ? dateStr : d.toISOString()
+  } catch {
+    return dateStr
+  }
+}
+
+function stripHtml(html) {
+  if (!html) return ''
+  return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+function extractImageFromContent(html) {
+  if (!html) return null
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i)
+  return match ? match[1] : null
+}
 
 async function fetchWithProxy(url, proxyFn) {
   const proxyUrl = proxyFn(url)
@@ -26,7 +137,7 @@ async function fetchWithProxy(url, proxyFn) {
   }
 
   if (!text) throw new Error('Empty response from proxy')
-  return parser.parseString(text)
+  return parseFeedXML(text)
 }
 
 export async function fetchFeed(url) {
@@ -55,31 +166,17 @@ export async function fetchFeed(url) {
 }
 
 export function normalizeItems(feed, feedId) {
-  return (feed.items || []).map((item) => {
-    const thumbnail =
-      item['media:thumbnail']?.$.url ||
-      item['media:content']?.$.url ||
-      item.enclosure?.url ||
-      extractImageFromContent(item.content || item['content:encoded'] || '')
-
-    return {
-      id: item.guid || item.id || `${feedId}-${item.link}-${item.pubDate}`,
-      feedId,
-      title: item.title || '(no title)',
-      link: item.link || '',
-      pubDate: item.isoDate || item.pubDate || '',
-      summary: item.contentSnippet || item.summary || '',
-      content: item.content || item['content:encoded'] || '',
-      author: item.creator || item.author || '',
-      thumbnail,
-    }
-  })
-}
-
-function extractImageFromContent(html) {
-  if (!html) return null
-  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i)
-  return match ? match[1] : null
+  return (feed.items || []).map((item) => ({
+    id: item.guid || `${feedId}-${item.link}-${item.pubDate}`,
+    feedId,
+    title: item.title || '(no title)',
+    link: item.link || '',
+    pubDate: item.isoDate || item.pubDate || '',
+    summary: item.summary || '',
+    content: item.content || '',
+    author: item.author || '',
+    thumbnail: item.thumbnail || null,
+  }))
 }
 
 export function getFeedMetadata(feed) {
@@ -88,7 +185,6 @@ export function getFeedMetadata(feed) {
     description: feed.description || '',
     link: feed.link || '',
     image: feed.image?.url || '',
-    language: feed.language || '',
-    lastBuildDate: feed.lastBuildDate || '',
   }
 }
+
