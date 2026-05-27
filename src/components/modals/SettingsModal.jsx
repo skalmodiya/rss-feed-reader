@@ -1,12 +1,8 @@
-import { useState } from 'react'
 import { XMarkIcon, TrashIcon } from '@heroicons/react/24/outline'
 import { useFeeds } from '../../contexts/FeedsContext'
-import { useArticles } from '../../contexts/ArticlesContext'
-import { AUTO_REFRESH_INTERVALS } from '../../constants'
 
 export function SettingsModal({ onClose }) {
   const { categories, removeCategory, feeds } = useFeeds()
-  const { autoRefresh, setAutoRefresh, autoRefreshInterval, setAutoRefreshInterval } = useArticles()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
@@ -22,32 +18,11 @@ export function SettingsModal({ onClose }) {
           {/* Auto-refresh */}
           <section>
             <h3 className="font-medium text-sm text-gray-900 dark:text-gray-100 mb-3">Auto Refresh</h3>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3 cursor-pointer">
-                <div
-                  onClick={() => setAutoRefresh(!autoRefresh)}
-                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${autoRefresh ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'}`}
-                >
-                  <span className={`absolute top-0.5 left-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform ${autoRefresh ? 'translate-x-5' : ''}`} />
-                </div>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  {autoRefresh ? 'Enabled' : 'Disabled'}
-                </span>
-              </label>
-              {autoRefresh && (
-                <div>
-                  <label className="block text-sm text-gray-600 dark:text-gray-400 mb-1">Interval</label>
-                  <select
-                    value={autoRefreshInterval}
-                    onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
-                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 dark:text-gray-100"
-                  >
-                    {AUTO_REFRESH_INTERVALS.map((opt) => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+            <div className="flex items-center gap-3 py-2 px-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+              <span className="text-blue-600 dark:text-blue-400 text-lg">🔄</span>
+              <p className="text-sm text-blue-700 dark:text-blue-300">
+                All feeds refresh automatically every <strong>15 minutes</strong> and on every login.
+              </p>
             </div>
           </section>
 
